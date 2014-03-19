@@ -89,10 +89,23 @@ class Game:
     return hash(s)
 
   def __mul__(self,other):
+    if other.__class__ == int:
+      return self.mulc(other)
+    return self.mulg(other)
+
+  def mulc(self,other):
     nG = np.zeros(self.dim)
     for (a,b,x,y) in itertools.product(*map(xrange,self.dim)):
         nG[a][b][x][y] = self.G[a][b][x][y]*other
     return Game(G=nG,dim=self.dim)
+
+  def mulg(self,other):
+    nG = np.zeros(map(int.__mul__,self.dim,other.dim))
+    for (a,b,x,y) in itertools.product(*map(xrange,self.dim)):
+      for (a_,b_,x_,y_) in itertools.product(*map(xrange,other.dim)):
+        nG[a_*self.dim[0]+a][b_*self.dim[1]+b][x_*self.dim[2]+x][y_*self.dim[3]+y] = \
+          self.G[a][b][x][y]*other.G[a_][b_][x_][y_]
+    return Game(G=nG,dim=map(int.__mul__,self.dim,other.dim))
 
   def __add__(self,other):
     nG = np.zeros(self.dim)
@@ -127,6 +140,22 @@ class Game:
     return [Fraction(v).limit_denominator(20).numerator*1.0/
       Fraction(v).limit_denominator(20).denominator for v in s['x']]
 
+#find a classical strategy (ie no communication from A to B) for g
+#this is not going to be fast...
+def cstrat(g):
+  asts = itertools.product(xrange(g.dim[0]),repeat=g.dim[2])
+  best = (0,None)
+  for ast in asts:
+    bsts = itertools.product(xrange(g.dim[1]),repeat=g.dim[3])
+    print '.',
+    for bst in bsts:
+      v = 0
+      for (x,y) in itertools.product(*map(xrange,g.dim[-2:])):
+        v += g.G[ast[x]][bst[y]][x][y]
+      if v > best[0]:
+        best = (v,(ast,bst))      
+  return best
+
 def getleft(dim=[2,2,2,2]):
   left = []
   #[[0]*dim**2 for i in dim]
@@ -155,3 +184,8 @@ def separate(used,results,side1,side2):
   assert(used == side1 + side2)
   return (reduce(lambda x,y:x+y,map(lambda x,y:x*y,side1,results[0:len(side1)])),
     reduce(lambda x,y:x+y,map(lambda x,y:x*y,side2,results[len(side1):])))
+
+#helper functions for now...
+imp = lambda a,b: True if (not(a) or b) else False
+ff = lambda x: True if x else False
+new = lambda a,b,x,y: (imp(y!=0,a==y) and imp(x!=0,b==x)) and imp((y == 0) and (x == 0),(ff(a) != ff(b))) and not (ff(x) and ff(y))
