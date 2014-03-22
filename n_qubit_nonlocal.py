@@ -14,6 +14,7 @@ import random, itertools, math
 from cvxopt import matrix, solvers
 from fractions import Fraction
 import numpy as np
+from z3 import *
 
 def rpartition(n=4):
   #generate a random distribution
@@ -89,7 +90,7 @@ class Game:
     return hash(s)
 
   def __mul__(self,other):
-    if other.__class__ == int:
+    if other.__class__ in [int,float]:
       return self.mulc(other)
     return self.mulg(other)
 
@@ -147,7 +148,6 @@ def cstrat(g):
   best = (0,None)
   for ast in asts:
     bsts = itertools.product(xrange(g.dim[1]),repeat=g.dim[3])
-    print '.',
     for bst in bsts:
       v = 0
       for (x,y) in itertools.product(*map(xrange,g.dim[-2:])):
@@ -155,6 +155,37 @@ def cstrat(g):
       if v > best[0]:
         best = (v,(ast,bst))      
   return best
+
+def csstrat(g):
+  asts = itertools.product(range(g.dim[0])[::-1],repeat=g.dim[2])
+  best = (0,None)
+  for ast in asts:
+    v = 0
+    for (x,y) in itertools.product(*map(xrange,g.dim[-2:])):
+      v += g.G[ast[x]][ast[y]][x][y]
+    if v > best[0]:
+      print v,ast
+      best = (v,(ast,ast))      
+  return best
+
+def z3strat(g):
+  ast = [Bools(' '.join(["ast%d_%d"%(x,d) for d in xrange(g.dim[0])])) for x in xrange(g.dim[0])]
+  s = Solver()
+  v = 0
+  for xast in ast:
+    for (a,b) in itertools.combinations(xast,2):
+      s.add(Not(And(a,b)))
+    s.add(Or(xast))
+  for (a,b,x,y) in itertools.product(*map(xrange,g.dim)):
+    v += If(ast[x][a], If(ast[y][b], g.G[a][b][x][y] ,0) ,0)
+  return s,ast,v
+
+def tstrat(s,g):
+  (ast,bst) = s
+  v = 0
+  for (x,y) in itertools.product(*map(xrange,g.dim[-2:])):
+    v += g.G[ast[x]][bst[y]][x][y]
+  return v
 
 def getleft(dim=[2,2,2,2]):
   left = []
